@@ -1,0 +1,223 @@
+import { type Model, uuid } from "./domain";
+// Equipment identity and notes transcribed from the user's October 17 field guide.
+// Assessments are not personal ratings. Unverified branding is kept explicit.
+const entries: [string, string[], string[], string[], string, string][] = [
+  [
+    "Rear Delt / Pec Fly",
+    ["Chest", "Rear deltoids"],
+    ["Front deltoids", "Upper/mid back"],
+    ["Pec fly", "Reverse pec fly"],
+    "Align seat and arm position; avoid forcing a deep shoulder stretch.",
+    "Nitro Plus",
+  ],
+  [
+    "Mid Row",
+    ["Upper/mid back", "Lats"],
+    ["Rear deltoids", "Biceps"],
+    ["Seated row"],
+    "Keep torso against the pad; avoid yanking.",
+    "Nitro Plus",
+  ],
+  [
+    "V-Triceps Extension",
+    ["Triceps"],
+    [],
+    ["Triceps extension"],
+    "Check elbow support and smooth resistance through the range.",
+    "Nitro Plus",
+  ],
+  [
+    "Lateral Raise",
+    ["Side deltoids"],
+    ["Trapezius"],
+    ["Lateral raise"],
+    "Adjust pads and arm angle; avoid excessive shrugging.",
+    "Nitro Plus",
+  ],
+  [
+    "Overhead Press",
+    ["Front deltoids", "Side deltoids"],
+    ["Triceps", "Upper chest"],
+    ["Shoulder press"],
+    "Match seat height to shoulders and use a comfortable grip.",
+    "Nitro Plus",
+  ],
+  [
+    "Vertical Chest",
+    ["Chest"],
+    ["Triceps", "Front deltoids"],
+    ["Chest press"],
+    "Adjust seat and handles to a comfortable pressing path.",
+    "Nitro Plus",
+  ],
+  [
+    "Preacher Curl",
+    ["Biceps"],
+    ["Forearms"],
+    ["Preacher curl"],
+    "Support upper arms; avoid elbow hyperextension.",
+    "Nitro Plus",
+  ],
+  [
+    "Lower Back",
+    ["Lower back"],
+    ["Glutes"],
+    ["Back extension"],
+    "Adjust position and avoid aggressive hyperextension.",
+    "Nitro Plus",
+  ],
+  [
+    "Rotary Torso",
+    ["Obliques"],
+    ["Abdominals"],
+    ["Torso rotation"],
+    "Start light, control rotation and avoid painful ranges.",
+    "Nitro Plus",
+  ],
+  [
+    "Abdominal",
+    ["Abdominals"],
+    ["Obliques"],
+    ["Abdominal crunch"],
+    "Flex through the trunk within a comfortable range.",
+    "Nitro Plus",
+  ],
+  [
+    "Hip Abduction / Adduction",
+    ["Hip abductors", "Hip adductors"],
+    ["Glutes"],
+    ["Hip abduction", "Hip adduction"],
+    "Set a comfortable starting angle and avoid bouncing.",
+    "Nitro Plus",
+  ],
+  [
+    "Leg Press",
+    ["Quadriceps", "Glutes"],
+    ["Calves"],
+    ["Leg press"],
+    "Keep pelvis on the pad; choose a comfortable depth.",
+    "Nitro Plus",
+  ],
+  [
+    "Leg Extension",
+    ["Quadriceps"],
+    [],
+    ["Leg extension"],
+    "Align the knee pivot and adjust the shin pad.",
+    "Nitro Plus",
+  ],
+  [
+    "Seated Leg Curl",
+    ["Hamstrings"],
+    ["Calves"],
+    ["Leg curl"],
+    "Align knee pivot and keep hips down.",
+    "Nitro Plus",
+  ],
+  [
+    "Gravitron Plus",
+    ["Lats"],
+    ["Biceps"],
+    ["Assisted pull-up", "Assisted dip"],
+    "Selected weight is assistance: more assistance is not increased resistance.",
+    "Gravitron Plus",
+  ],
+  [
+    "Freedom Trainer",
+    ["Biceps"],
+    ["Forearms"],
+    [
+      "Cable curl",
+      "Cable lateral raise",
+      "Cable fly",
+      "Triceps pushdown",
+      "Cable row",
+    ],
+    "Record attachment, pulley position, single/dual setup and load basis. Stack weight is not handle resistance.",
+    "Freedom Trainer",
+  ],
+  [
+    "ISO-Lateral Overhead Shoulder Press",
+    ["Front deltoids", "Upper chest"],
+    ["Side deltoids", "Triceps"],
+    ["Shoulder press"],
+    "Check grip and seat fit; record whether load is per side or total.",
+    "XPLOAD",
+  ],
+  [
+    "ISO-Lateral Incline Chest Press",
+    ["Upper chest"],
+    ["Front deltoids", "Triceps"],
+    ["Incline chest press"],
+    "Wide starting position may not suit every frame.",
+    "XPLOAD",
+  ],
+  [
+    "Seated Calf Raise",
+    ["Calves"],
+    [],
+    ["Seated calf raise"],
+    "XPLOAD / XPLODE naming unverified. Inspect badge; pause and avoid bouncing.",
+    "XPLOAD / XPLODE — unverified",
+  ],
+  [
+    "Additional cable station",
+    ["Lats"],
+    ["Biceps"],
+    ["Lat pulldown", "Cable curl", "Cable row", "Triceps pushdown"],
+    "Individual models not identified. Rename and configure each physical machine before comparing loads.",
+    "Unidentified",
+  ],
+  [
+    "Preacher Curl Bench",
+    ["Biceps"],
+    ["Forearms"],
+    ["EZ-bar preacher curl", "Dumbbell preacher curl"],
+    "F3PC revision unverified. Record bar-plus-plates total only when known.",
+    "F3PC — revision unverified",
+  ],
+];
+export function initialModels(): Model[] {
+  return entries.map(([name, primary, secondary, exercises, notes, model]) => ({
+    id: uuid(),
+    name,
+    manufacturer: "Nautilus",
+    model,
+    category:
+      model.includes("Cable") ||
+      name.includes("cable") ||
+      name === "Freedom Trainer"
+        ? "Cable"
+        : name.includes("Bench")
+          ? "Bench"
+          : "Machine",
+    nickname: "",
+    primary,
+    secondary,
+    exercises,
+    notes,
+    rating: null,
+    comfort: null,
+    adjustability: null,
+    movement: null,
+    favorite: false,
+    photo: null,
+  }));
+}
+export function primaryFor(name: string, fallback: string[]) {
+  const map: Record<string, string[]> = {
+    "Pec fly": ["Chest"],
+    "Reverse pec fly": ["Rear deltoids"],
+    "Hip abduction": ["Hip abductors"],
+    "Hip adduction": ["Hip adductors"],
+    "Assisted dip": ["Triceps", "Chest"],
+    "Assisted pull-up": ["Lats"],
+    "Cable curl": ["Biceps"],
+    "Cable lateral raise": ["Side deltoids"],
+    "Cable fly": ["Chest"],
+    "Triceps pushdown": ["Triceps"],
+    "Cable row": ["Upper/mid back", "Lats"],
+    "Lat pulldown": ["Lats"],
+  };
+  return map[name] || fallback;
+}

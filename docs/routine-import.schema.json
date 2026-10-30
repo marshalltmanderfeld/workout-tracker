@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "position": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scheduled_date": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "exercises": {
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "model_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "instance_id": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "equipment_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "primary": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "secondary": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "pulley": {
+                "default": "none",
+                "type": "string",
+                "enum": [
+                  "none",
+                  "single",
+                  "dual"
+                ]
+              },
+              "load_basis": {
+                "default": "stack",
+                "type": "string",
+                "enum": [
+                  "stack",
+                  "per_stack",
+                  "combined",
+                  "total",
+                  "added_plates",
+                  "assistance",
+                  "unknown"
+                ]
+              },
+              "attachment": {
+                "default": "",
+                "type": "string",
+                "maxLength": 200
+              },
+              "position": {
+                "default": "",
+                "type": "string",
+                "maxLength": 200
+              },
+              "notes": {
+                "default": "",
+                "type": "string",
+                "maxLength": 5000
+              }
+            },
+            "required": [
+              "pulley",
+              "load_basis",
+              "attachment",
+              "position",
+              "notes"
+            ],
+            "additionalProperties": false
+          },
+          "skipped": {
+            "default": false,
+            "type": "boolean"
+          },
+          "notes": {
+            "default": "",
+            "type": "string",
+            "maxLength": 5000
+          },
+          "sets": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "weight": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reps": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "rir": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "warmup": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "completed": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "verified": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "approximate": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "notes": {
+                  "default": "",
+                  "type": "string",
+                  "maxLength": 5000
+                }
+              },
+              "required": [
+                "id",
+                "weight",
+                "reps",
+                "rir",
+                "warmup",
+                "completed",
+                "verified",
+                "approximate",
+                "notes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "instance_id",
+          "name",
+          "equipment_name",
+          "primary",
+          "secondary",
+          "config",
+          "skipped",
+          "notes",
+          "sets"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "position",
+    "scheduled_date",
+    "exercises"
+  ],
+  "additionalProperties": false
+}
