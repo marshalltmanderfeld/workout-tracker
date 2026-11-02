@@ -1263,3 +1263,137 @@ footer {
     scroll-behavior: auto !important;
   }
 }
+
+/* Keep intrinsic form/table widths inside their grid columns. */
+.grid > *, .workout-layout > *, .stat-grid > *, .page-heading > *,
+.journal-entry > div, .inventory-row > div, .routine > span {
+  min-width: 0;
+}
+input, select, textarea { min-width: 0; max-width: 100%; }
+.card, .modal { overflow-wrap: anywhere; }
+button svg, .button svg { flex-shrink: 0; }
+
+@media (max-width: 800px) {
+  html { scroll-padding-bottom: 110px; }
+  .main { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  main {
+    padding: 20px max(14px, env(safe-area-inset-right)) 24px max(14px, env(safe-area-inset-left));
+  }
+  .topbar {
+    height: auto;
+    min-height: 56px;
+    padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .topbar > span { letter-spacing: .06em; }
+  .sync { flex-wrap: wrap; }
+  .sidebar nav button { min-height: 56px; font-size: 10px; }
+  button, .button, td button, .equipment-foot button,
+  .equipment .section-title button { min-height: 44px; }
+  input, select, textarea, .filters input, .filters select, .code-input {
+    font-size: 16px;
+  }
+  input:not([type="checkbox"]), select { min-height: 48px; }
+  .card { padding: 18px; margin-bottom: 16px; }
+  .equipment { padding: 0; }
+  .section-title { flex-wrap: wrap; }
+  .page-heading { margin-bottom: 20px; }
+  .page-heading h1 { font-size: 27px; }
+  .page-heading .actions { justify-content: flex-start; }
+  .page-heading .actions > button { flex: 1 1 140px; }
+  .logger > h2 { font-size: 25px; }
+  .exercise-list { max-height: 260px; overflow-y: auto; }
+  .exercise-list .exercise-tab { max-width: 100%; }
+  .exercise-list .exercise-tab b { font-size: 14px; }
+  .exercise-list .exercise-tab small { font-size: 12px; }
+  .exercise-list > button:last-child { width: 100%; }
+  .previous { padding: 14px; margin: 18px 0; }
+  .previous-sets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .previous-sets span { font-size: 12px; }
+  .previous-sets small { display: block; }
+  .set-inputs { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); gap: 8px; }
+  .set-inputs label { font-size: 12px; margin: 10px 0; }
+  .set-inputs label span { font-size: 11px; }
+  .set-inputs input { padding: 8px; height: 72px; font-size: 32px; }
+  .set-inputs .rir { grid-column: 1 / -1; max-width: 180px; }
+  .set-inputs .rir input { height: 48px; font-size: 22px; margin-top: 6px; }
+  .logger .actions > input { flex-basis: 100%; }
+  .checkbox { min-height: 44px; margin: 6px 0; font-size: 14px; }
+  .checkbox input { flex-shrink: 0; width: 20px; height: 20px; }
+  .table-wrap { max-width: 100%; }
+  .table-wrap table { min-width: 440px; }
+  .logger .spread > button { flex: 1 1 130px; }
+  .filters { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .filters input, .filters select, .search { width: 100%; min-width: 0; }
+  .filters .search { margin: 0; }
+  .actions select { width: 100%; flex-basis: 100%; }
+  .stat-grid { gap: 10px; }
+  .stat { padding: 14px; }
+  .stat span { font-size: 11px; }
+  .stat small { font-size: 13px; }
+  .chart { height: 260px; }
+  .record { gap: 12px; }
+  .record b { text-align: right; }
+  .journal-entry > .actions { margin-left: 0; width: 100%; }
+  .journal-entry > .actions button { flex: 1; }
+  .journal-entry > div:nth-child(2) { flex-basis: calc(100% - 90px); }
+  .inventory-row { flex-wrap: wrap; gap: 10px; }
+  .inventory-row > div { flex-basis: 100%; }
+  .segmented { flex-wrap: wrap; }
+  .modal-backdrop { padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+  .modal { padding: 18px; max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  .modal .actions > button { flex: 1 1 120px; }
+  .stars { flex-wrap: wrap; gap: 0; }
+  .stars button { min-width: 44px; min-height: 44px; }
+  .calendar { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .calendar > div { min-width: 0; padding: 3px; }
+  .calendar button { min-height: 44px; overflow-wrap: anywhere; }
+  footer { flex-wrap: wrap; gap: 8px; padding: 16px; }
+  .gate { padding: 30px 16px; }
+}
+
+@media (max-width: 540px) {
+  .equipment-grid { grid-template-columns: minmax(0, 1fr); }
+  .equipment-photo { height: 210px; object-fit: contain; }
+  .equipment-content { padding: 18px; }
+  .equipment h3 { font-size: 20px; }
+  .equipment .eyebrow { font-size: 10px; }
+  .equipment p { font-size: 14px; }
+  .equipment .stars svg { width: 18px; }
+  .equipment-foot { display: flex; gap: 12px; }
+  .equipment-foot button { float: none; font-size: 14px; }
+  .equipment-foot span { font-size: 12px; }
+  .hero { min-height: 0; }
+  .hero h2 { font-size: 28px; margin-top: 20px; }
+  .hero > .primary { width: 100%; }
+  .auth-story { padding: 24px; }
+  .auth-story .brand { margin-bottom: 18px; }
+  .auth-story h1 { font-size: 32px; }
+  .auth-panel { padding: 12px; }
+}
+
+.mobile-page-title { display: none; }
+@media (max-width: 800px) {
+  .mobile-page-title { display: block; font-size: 20px; letter-spacing: -.03em; }
+  .topbar .desktop-tagline { display: none; }
+  .topbar { position: sticky; top: 0; z-index: 9; background: var(--card); }
+  .topbar > .actions { gap: 4px; }
+  .topbar .sync { font-size: 10px; gap: 4px; }
+  .topbar button { padding: 8px; min-width: 44px; }
+  .sidebar { box-shadow: 0 -3px 18px #00000008; }
+  .sidebar nav button.active { color: var(--accent); background: var(--soft); }
+  .sidebar nav button svg { width: 22px; height: 22px; }
+  main { padding-top: 16px; }
+  .page-heading > div > .eyebrow { display: none; }
+  .page-heading h1 { font-size: 24px; margin-top: 0; }
+  .hero > .pill, .hero > h2, .hero > p { display: none; }
+  .hero label { margin-top: 0; max-width: none; }
+  .hero > .primary { width: 100%; }
+  .hero { min-height: 0; }
+  .empty { padding: 28px 12px; min-height: 100px; }
+  .app footer { display: none; }
+  .auth-story h1, .auth-story > p { display: none; }
+  .auth-story .brand { margin-bottom: 0; }
+  .auth-story { padding: 20px 24px; }
+}
