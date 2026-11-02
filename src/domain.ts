@@ -210,7 +210,13 @@ export function previousPerformance(
   return [...sessions]
     .filter(
       (s) =>
-        s.id !== active.id && s.status === "completed" && s.date <= active.date,
+        s.id !== active.id &&
+        s.status === "completed" &&
+        (s.date < active.date ||
+          (s.date === active.date &&
+            (!active.started_at ||
+              !s.started_at ||
+              s.started_at < active.started_at))),
     )
     .sort(
       (a, b) =>
@@ -219,7 +225,12 @@ export function previousPerformance(
     )
     .flatMap((s) =>
       s.exercises
-        .filter((x) => comparisonKey(x) === comparisonKey(e))
+        .filter(
+          (x) =>
+            !x.skipped &&
+            x.sets.some((set) => set.completed) &&
+            comparisonKey(x) === comparisonKey(e),
+        )
         .map((x) => ({ session: s, exercise: x })),
     )[0];
 }

@@ -165,19 +165,15 @@ export function Analytics({
         (s) => s.date >= periodStart("year") && s.date <= localDate(),
       ),
     );
-  const repChart = chart.map((c) => ({
-    date: c.date,
-    reps: Math.max(
-      0,
-      ...filtered
-        .filter(
-          (x) =>
-            x.session.date === c.date &&
-            String(x.set.weight) === selectedWeight,
-        )
-        .map((x) => x.set.reps),
-    ),
-  }));
+  const repChart = chart.flatMap((c) => {
+    const matches = eligible.filter(
+      (x) =>
+        x.session.date === c.date && String(x.set.weight) === selectedWeight,
+    );
+    return matches.length
+      ? [{ date: c.date, reps: Math.max(...matches.map((x) => x.set.reps)) }]
+      : [];
+  });
   return (
     <>
       <div className="page-heading">
@@ -264,6 +260,8 @@ export function Analytics({
             onChange={(e) => {
               setModel(e.target.value);
               setConfig("");
+              setSelectedWeight("");
+              setMetric("sets");
             }}
           >
             <option value="">All equipment</option>
@@ -279,6 +277,8 @@ export function Analytics({
             onChange={(e) => {
               setExercise(e.target.value);
               setConfig("");
+              setSelectedWeight("");
+              setMetric("sets");
             }}
           >
             <option value="">All exercises</option>
@@ -289,7 +289,11 @@ export function Analytics({
           <select
             aria-label="Comparable configuration"
             value={config}
-            onChange={(e) => setConfig(e.target.value)}
+            onChange={(e) => {
+              setConfig(e.target.value);
+              setSelectedWeight("");
+              setMetric("sets");
+            }}
           >
             <option value="">All setups · set counts only</option>
             {configurations.map(([key, e], i) => (
@@ -516,6 +520,8 @@ export function Analytics({
               onClick={() => {
                 setModel(m.id);
                 setConfig("");
+                setSelectedWeight("");
+                setMetric("sets");
               }}
             >
               <b>{m.name}</b>

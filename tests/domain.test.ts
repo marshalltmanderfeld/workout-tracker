@@ -92,6 +92,44 @@ describe("private workout domain", () => {
       previousPerformance([b, a], active, active.exercises[0])?.session.id,
     ).toBe(a.id);
   });
+  it("previous performance skips empty, skipped and incomplete attempts", () => {
+    const older = session("2026-10-19"),
+      newer = session("2026-10-21");
+    const active = session("2026-10-23");
+    for (const kind of ["empty", "skipped", "incomplete"]) {
+      const candidate = structuredClone(newer);
+      if (kind === "empty") candidate.exercises[0].sets = [];
+      if (kind === "skipped") candidate.exercises[0].skipped = true;
+      if (kind === "incomplete")
+        candidate.exercises[0].sets[0].completed = false;
+      expect(
+        previousPerformance([candidate, older], active, active.exercises[0])
+          ?.session.id,
+      ).toBe(older.id);
+    }
+  });
+  it("previous performance excludes later sessions on the same day", () => {
+    const earlier = session(),
+      later = session(),
+      active = session();
+    earlier.started_at = "2026-10-19T10:00:00Z";
+    active.started_at = "2026-10-19T12:00:00Z";
+    later.started_at = "2026-10-19T14:00:00Z";
+    expect(
+      previousPerformance([later, active, earlier], active, active.exercises[0])
+        ?.session.id,
+    ).toBe(earlier.id);
+  });
+  it("previous performance retains unverified and unknown loads as reference", () => {
+    const older = session(),
+      active = session("2026-10-23");
+    older.exercises[0].sets[0].verified = false;
+    older.exercises[0].sets[0].weight = null;
+    expect(
+      previousPerformance([older], active, active.exercises[0])?.exercise
+        .sets[0].weight,
+    ).toBeNull();
+  });
   it("calendar totals have Monday weeks and inclusive month/year boundaries", () => {
     const now = new Date(2026, 9, 29, 12);
     expect(periodStart("week", now)).toBe("2026-10-26");

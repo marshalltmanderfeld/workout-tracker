@@ -78,8 +78,16 @@ export function Workout({
       draft && e ? previousPerformance(data.sessions, draft, e) : undefined;
   const field = e
     ? inputs[e.id] || {
-        weight: previous?.exercise.sets.at(-1)?.weight?.toString() || "",
-        reps: previous?.exercise.sets.at(-1)?.reps.toString() || "",
+        weight:
+          previous?.exercise.sets
+            .filter((s) => s.completed)
+            .at(-1)
+            ?.weight?.toString() || "",
+        reps:
+          previous?.exercise.sets
+            .filter((s) => s.completed)
+            .at(-1)
+            ?.reps.toString() || "",
         rir: "",
         warmup: false,
         notes: "",
@@ -566,26 +574,47 @@ export function Workout({
               <div className="previous">
                 <div className="section-title">
                   <b>
-                    <RotateCcw size={14} /> Previous comparable attempt
+                    <RotateCcw size={14} /> Last time · weights & reps
                   </b>
                   <small>{previous?.session.date || "A new baseline"}</small>
                 </div>
                 {previous ? (
-                  <div className="previous-sets">
-                    {previous.exercise.sets
-                      .filter((s) => s.completed)
-                      .map((s, i) => (
-                        <span key={s.id}>
-                          Set {i + 1}{" "}
-                          <b>
-                            {s.weight ?? "?"} lb × {s.reps}
-                          </b>
-                          {!s.verified && " · provisional"}
-                        </span>
-                      ))}
-                  </div>
+                  <>
+                    <p>
+                      {previous.session.name} · {previous.session.gym_name}
+                    </p>
+                    <div className="previous-sets">
+                      {previous.exercise.sets
+                        .filter((s) => s.completed)
+                        .map((s, i) => (
+                          <span key={s.id}>
+                            Set {i + 1}{" "}
+                            <b>
+                              {s.weight === null
+                                ? "Unknown weight"
+                                : `${s.weight} lb`}{" "}
+                              × {s.reps}
+                            </b>
+                            {s.warmup && " · warm-up"}
+                            {!s.verified && " · unverified"}
+                            {s.approximate && " · approximate"}
+                            {s.notes && <small>{s.notes}</small>}
+                          </span>
+                        ))}
+                    </div>
+                    {previous.exercise.notes && (
+                      <p>{previous.exercise.notes}</p>
+                    )}
+                    <small>
+                      Reference only · same exercise, machine and setup. Log
+                      each new set below.
+                    </small>
+                  </>
                 ) : (
-                  <p>No matching exercise, machine and configuration yet.</p>
+                  <p>
+                    No earlier completed sets for this exercise, machine and
+                    setup yet.
+                  </p>
                 )}
               </div>
               <div className="set-inputs">
