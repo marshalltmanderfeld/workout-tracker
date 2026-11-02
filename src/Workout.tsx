@@ -109,7 +109,13 @@ export function Workout({
       } catch {}
     }
   }
+  const preparing = !!draft && !session && draft.started_at === null;
   async function commit(next: Session) {
+    if (!session && next.started_at === null) {
+      setDraft(next);
+      setError("");
+      return next;
+    }
     setPending(true);
     setError("");
     try {
@@ -144,7 +150,7 @@ export function Workout({
       id: uuid(),
       name: template?.name || "Open workout",
       date: localDate(),
-      started_at: new Date().toISOString(),
+      started_at: null,
       ended_at: null,
       gym_id: g.id,
       gym_name: g.name,
@@ -166,7 +172,9 @@ export function Workout({
           skipped: false,
         })) || (first ? [first] : []),
     };
-    await action(s);
+    setDraft(s);
+    setError("");
+    showLogger(0);
   }
   async function log() {
     if (!draft || !e || !field) return;
@@ -182,8 +190,12 @@ export function Workout({
         approximate: false,
         notes: field.notes,
       };
+      const loggedAt = new Date();
       const next = sessionSchema.parse({
         ...draft,
+        ...(preparing
+          ? { started_at: loggedAt.toISOString(), date: localDate(loggedAt) }
+          : {}),
         exercises: draft.exercises.map((x) =>
           x.id === e.id ? { ...x, sets: [...x.sets, set] } : x,
         ),
@@ -430,7 +442,10 @@ export function Workout({
         <div className="page-heading">
           <div>
             <h1>Log an exercise</h1>
-            <p>Pick your first movement to start logging sets.</p>
+            <p>
+              Choose a movement. Your workout starts when you log your first
+              set.
+            </p>
           </div>
         </div>
         <section className="card">
@@ -488,10 +503,14 @@ export function Workout({
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            {draft.status === "active" ? "IN PROGRESS" : "SESSION DETAILS"} ·{" "}
-            {draft.gym_name}
+            {preparing
+              ? "FIRST SET"
+              : draft.status === "active"
+                ? "IN PROGRESS"
+                : "SESSION DETAILS"}{" "}
+            · {draft.gym_name}
           </p>
-          <h1>{draft.name}</h1>
+          <h1>{preparing ? "Log your first set" : draft.name}</h1>
           <p>
             {draft.date} ·{" "}
             {draft.started_at && draft.status === "active"
@@ -501,7 +520,9 @@ export function Workout({
                     (time - new Date(draft.started_at).getTime()) / 60000,
                   ),
                 ) + " min elapsed"
-              : draft.status}{" "}
+              : preparing
+                ? "Ready to log"
+                : draft.status}{" "}
             ·{" "}
             {draft.exercises.reduce(
               (n, x) => n + x.sets.filter((s) => s.completed).length,
@@ -514,7 +535,7 @@ export function Workout({
           <button disabled={locked} onClick={() => onTemplate(draft)}>
             <Save size={16} /> Save as routine
           </button>
-          {draft.status === "active" && (
+          {!preparing && draft.status === "active" && (
             <button
               className="primary"
               disabled={locked}
@@ -974,11 +995,17 @@ export function Workout({
           className="danger"
           disabled={locked}
           onClick={() => {
+            if (preparing) {
+              setDraft(undefined);
+              setSelected(0);
+              setInputs({});
+              return;
+            }
             if (confirm("Permanently delete this workout and its sets?"))
               void onDelete(draft.id);
           }}
         >
-          <Trash2 size={16} /> Delete workout
+          <Trash2 size={16} /> {preparing ? "Discard draft" : "Delete workout"}
         </button>
       </details>
       {editing && e && (
