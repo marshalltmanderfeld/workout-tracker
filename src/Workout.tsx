@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   Check,
@@ -40,7 +40,10 @@ export function Workout({
 }) {
   const [draft, setDraft] = useState<Session | undefined>(session),
     [selected, setSelected] = useState(0),
-    [add, setAdd] = useState(""),
+    [query, setQuery] = useState(""),
+    [finderOpen, setFinderOpen] = useState(false),
+    loggerRef = useRef<HTMLElement>(null),
+    finderRef = useRef<HTMLDivElement>(null),
     [gym, setGym] = useState(data.gyms[0]?.id || ""),
     [inputs, setInputs] = useState<
       Record<
@@ -188,6 +191,58 @@ export function Workout({
       input("notes", "");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+  useEffect(() => {
+    if (!finderOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !finderRef.current?.contains(event.target)
+      ) {
+        setFinderOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [finderOpen]);
+  const normalized = (text: string) =>
+    text.toLowerCase().replace(/[\s-]+/g, "");
+  const matches = (...values: string[]) =>
+    values.some((value) => normalized(value).includes(normalized(query)));
+  const inSession = (draft?.exercises || [])
+    .map((exercise, index) => ({ exercise, index }))
+    .filter(({ exercise }) => matches(exercise.name, exercise.equipment_name));
+  const available = finderOpen
+    ? data.models.flatMap((model) =>
+        (model.exercises.length ? model.exercises : [model.name])
+          .filter((name) =>
+            matches(name, model.nickname, model.name, model.model),
+          )
+          .map((name) => ({ model, name })),
+      )
+    : [];
+  function showLogger(index: number) {
+    setSelected(index);
+    setFinderOpen(false);
+    setQuery("");
+    finderRef.current?.querySelector("input")?.blur();
+    requestAnimationFrame(() =>
+      loggerRef.current?.scrollIntoView({ block: "start" }),
+    );
+  }
+  async function addMovement(model: Data["models"][number], name: string) {
+    if (!draft || pending || busy) return;
+    const instance = data.instances.find(
+      (i) => i.model_id === model.id && i.gym_id === draft.gym_id,
+    );
+    const next = newExercise(model, instance, name);
+    next.primary = primaryFor(name, next.primary);
+    try {
+      await commit({ ...draft, exercises: [...draft.exercises, next] });
+      showLogger(draft.exercises.length);
+    } catch {
+      /* commit displays the save error. */
     }
   }
   const locked = pending || busy;
@@ -348,61 +403,82 @@ export function Workout({
         </div>
       )}
       <div className="workout-layout">
-        <aside className="card exercise-list">
-          <div className="section-title">
-            <h3>Session plan</h3>
-            <span>{draft.exercises.length}</span>
-          </div>
-          {draft.exercises.map((x, i) => (
-            <button
-              className={"exercise-tab " + (i === selected ? "selected" : "")}
-              key={x.id}
-              onClick={() => setSelected(i)}
-            >
-              <span className="number">{String(i + 1).padStart(2, "0")}</span>
-              <span>
-                <b>{x.name}</b>
-                <small>
-                  {x.skipped ? "Skipped" : `${x.sets.length} sets`} ·{" "}
-                  {x.equipment_name}
-                </small>
-              </span>
-            </button>
-          ))}
-          <label>
-            Add exercise
-            <select
-              value={add}
-              onChange={(event) => setAdd(event.target.value)}
-            >
-              <option value="">Choose equipment…</option>
-              {data.models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nickname || m.name} · {m.model}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            disabled={!add || locked}
-            onClick={() => {
-              const m = data.models.find((x) => x.id === add)!;
-              const next = newExercise(
-                m,
-                data.instances.find(
-                  (i) => i.model_id === m.id && i.gym_id === draft.gym_id,
-                ),
-              );
-              next.primary = primaryFor(next.name, next.primary);
-              void action({ ...draft, exercises: [...draft.exercises, next] });
-              setSelected(draft.exercises.length);
-              setAdd("");
+        <aside className="card movement-picker">
+          <div
+            ref={finderRef}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setFinderOpen(false);
+                event.currentTarget.querySelector("input")?.blur();
+              }
             }}
           >
-            <Plus size={16} /> Add to session
-          </button>
+            <label htmlFor="movement-search">Find or add an exercise</label>
+            <input
+              id="movement-search"
+              type="search"
+              placeholder="Search exercises, e.g. lat pulldown"
+              value={query}
+              aria-expanded={finderOpen}
+              aria-controls="movement-results"
+              onFocus={() => setFinderOpen(true)}
+              onClick={() => setFinderOpen(true)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setFinderOpen(true);
+              }}
+            />
+            {finderOpen && (
+              <div id="movement-results" className="movement-results">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFinderOpen(false);
+                    setQuery("");
+                  }}
+                >
+                  Close search
+                </button>
+                {inSession.length > 0 && <h3>In this workout</h3>}
+                {inSession.map(({ exercise, index }) => (
+                  <button
+                    className="routine"
+                    key={exercise.id}
+                    disabled={locked}
+                    onClick={() => showLogger(index)}
+                  >
+                    <span>
+                      <b>{exercise.name}</b>
+                      <small>
+                        {exercise.equipment_name} · {exercise.sets.length} sets
+                      </small>
+                    </span>
+                    Open
+                  </button>
+                ))}
+                {available.length > 0 && <h3>Add to workout</h3>}
+                {available.map(({ model, name }) => (
+                  <button
+                    className="routine"
+                    key={model.id + ":" + name}
+                    disabled={locked}
+                    onClick={() => addMovement(model, name)}
+                  >
+                    <span>
+                      <b>{name}</b>
+                      <small>{model.nickname || model.name}</small>
+                    </span>
+                    <span>+ Add</span>
+                  </button>
+                ))}
+                {!available.length && !inSession.length && (
+                  <p>No matches. Try another movement or equipment name.</p>
+                )}
+              </div>
+            )}
+          </div>
         </aside>
-        <section className="card logger">
+        <section ref={loggerRef} className="card logger">
           {e && field ? (
             <>
               <div className="section-title">
@@ -775,8 +851,7 @@ export function Workout({
               <Plus size={32} />
               <h2>Build your session</h2>
               <p>
-                Add a machine or exercise from the session plan to start
-                logging.
+                Use the search bar above to add an exercise and start logging.
               </p>
             </div>
           )}
