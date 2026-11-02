@@ -333,6 +333,7 @@ function App() {
                   session={session}
                   busy={busy}
                   onSave={save}
+                  onSaveModel={(model) => saveEntity("models", model)}
                   onTemplate={async (s) => {
                     const name = prompt("Routine name", s.name);
                     if (!name) return;

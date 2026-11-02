@@ -27,6 +27,7 @@ export function Workout({
   data,
   session,
   onSave,
+  onSaveModel,
   onTemplate,
   onDelete,
   busy,
@@ -34,6 +35,7 @@ export function Workout({
   data: Data;
   session: Session | undefined;
   onSave: (s: Session) => Promise<Session>;
+  onSaveModel: (model: Data["models"][number]) => Promise<void>;
   onTemplate: (s: Session) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   busy: boolean;
@@ -245,6 +247,71 @@ export function Workout({
       /* commit displays the save error. */
     }
   }
+  const typedName = query.trim();
+  const exactSession = inSession.filter(
+    ({ exercise }) => normalized(exercise.name) === normalized(typedName),
+  );
+  const exactCatalog = available.filter(
+    ({ name }) => normalized(name) === normalized(typedName),
+  );
+  async function createMovement() {
+    if (!typedName || !draft || busy || pending) return;
+    const model: Data["models"][number] = {
+      id: uuid(),
+      name: typedName,
+      manufacturer: "",
+      model: "",
+      category: "Custom",
+      nickname: "",
+      primary: [],
+      secondary: [],
+      exercises: [typedName],
+      notes: "",
+      rating: null,
+      comfort: null,
+      adjustability: null,
+      movement: null,
+      favorite: false,
+      photo: null,
+    };
+    try {
+      await onSaveModel(model);
+      await addMovement(model, typedName);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't save this exercise. Please try again.",
+      );
+    }
+  }
+  function submitSearch() {
+    if (!typedName || busy || pending) return;
+    if (exactSession.length) {
+      if (exactSession.length === 1) showLogger(exactSession[0].index);
+      return;
+    }
+    if (exactCatalog.length) {
+      if (exactCatalog.length === 1)
+        void addMovement(exactCatalog[0].model, exactCatalog[0].name);
+      return;
+    }
+    if (inSession.length || available.length) {
+      if (
+        inSession.length === 1 &&
+        !available.some(
+          ({ model, name }) =>
+            model.id !== inSession[0].exercise.model_id ||
+            name !== inSession[0].exercise.name,
+        )
+      )
+        showLogger(inSession[0].index);
+      else if (!inSession.length && available.length === 1)
+        void addMovement(available[0].model, available[0].name);
+      return;
+    }
+    void createMovement();
+  }
   const locked = pending || busy;
   const ordered = [...data.templates].sort((a, b) => a.position - b.position);
   const last = data.sessions
@@ -417,6 +484,14 @@ export function Workout({
             <input
               id="movement-search"
               type="search"
+              enterKeyHint="go"
+              maxLength={200}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  submitSearch();
+                }
+              }}
               placeholder="Search exercises, e.g. lat pulldown"
               value={query}
               aria-expanded={finderOpen}
@@ -471,8 +546,14 @@ export function Workout({
                     <span>+ Add</span>
                   </button>
                 ))}
-                {!available.length && !inSession.length && (
-                  <p>No matches. Try another movement or equipment name.</p>
+                {typedName && !exactSession.length && !exactCatalog.length && (
+                  <button
+                    className="routine"
+                    disabled={locked}
+                    onClick={createMovement}
+                  >
+                    + Create “{typedName}” and add to workout
+                  </button>
                 )}
               </div>
             )}
