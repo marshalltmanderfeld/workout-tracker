@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Dumbbell,
+  Grid2X2,
   NotebookPen,
   ChartNoAxesCombined,
   MapPin,
@@ -34,6 +35,7 @@ import {
   templateSchema,
 } from "./domain";
 import { initialModels } from "./catalog";
+import { PixelGym } from "./pixel-gym/PixelGym";
 import { Workout } from "./Workout";
 import { Catalog, Gyms } from "./Catalog";
 import { Analytics, Journal } from "./Analytics";
@@ -236,6 +238,7 @@ function App() {
     ["Workout", Dumbbell],
     ["Journal", NotebookPen],
     ["Analytics", ChartNoAxesCombined],
+    ["Pixel Gym", Grid2X2],
     ["Equipment", Dumbbell],
     ["Gyms", MapPin],
     ["Settings", SettingsIcon],
@@ -427,6 +430,7 @@ function App() {
                   }}
                 />
               )}
+              {page === "Pixel Gym" && <PixelGym sessions={data.sessions} />}
               {page === "Analytics" && (
                 <Analytics data={data} initialModel={modelFilter} />
               )}{" "}
@@ -547,7 +551,7 @@ function PracticeWorkspace({
       </header>
       <p>Practice workouts stay here until you exit or refresh.</p>
       <nav aria-label="Test mode screens" className="actions">
-        {["Workout", "Journal", "Analytics"].map((name) => (
+        {["Workout", "Journal", "Analytics", "Pixel Gym"].map((name) => (
           <button
             key={name}
             className={tab === name ? "primary" : ""}
@@ -618,6 +622,7 @@ function PracticeWorkspace({
           }}
         />
       )}
+      {tab === "Pixel Gym" && <PixelGym sessions={data.sessions} />}
       {tab === "Analytics" && <Analytics data={data} />}
     </main>
   );

@@ -1,0 +1,35 @@
+.pixel-page header p {
+  margin-top: 0;
+}
+.pixel-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(230px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.pixel-layout figure {
+  margin: 0;
+  min-width: 0;
+}
+.pixel-layout canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  display: block;
+  image-rendering: pixelated;
+  background: #d4c9b6;
+}
+.pixel-layout figcaption {
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.pixel-layout button[aria-pressed="true"] {
+  background: var(--button);
+  color: var(--onbutton);
+}
+@media (max-width: 1000px) {
+  .pixel-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
