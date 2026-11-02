@@ -347,6 +347,7 @@ function App() {
             {error && <div className="error">{error}</div>}
             {notice && <div className="toast">{notice}</div>}
           </div>
+          {page === "Settings" && <AccountUsername key={user} user={user} />}
           {loading && !data.gyms.length ? (
             <div className="empty">Loading your training space…</div>
           ) : !data.models.length ? (
@@ -621,6 +622,125 @@ function PracticeWorkspace({
     </main>
   );
 }
+function AccountUsername({ user }: { user: string }) {
+  const [saved, setSaved] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let current = true;
+    setMessage("");
+    void db!
+      .from("account_handles")
+      .select("username")
+      .eq("user_id", user)
+      .single()
+      .then(({ data, error }) => {
+        if (!current) return;
+        if (error) setMessage("Couldn’t load your username.");
+        else {
+          setSaved(data.username);
+          setName(data.username);
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [user, attempt]);
+  return (
+    <section className="card">
+      <h2>{saved ? "@" + saved : "Username"}</h2>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const username = name.trim().toLowerCase();
+          if (
+            !/^[a-z0-9_]{3,24}$/.test(username) ||
+            /^lifter_[0-9]+$/.test(username)
+          ) {
+            setMessage(
+              "Use 3–24 letters, numbers or underscores. Names like lifter_123 are reserved.",
+            );
+            return;
+          }
+          setBusy(true);
+          try {
+            const { error } = await db!
+              .from("account_handles")
+              .update({ username })
+              .eq("user_id", user)
+              .select("username")
+              .single();
+            if (error) {
+              setMessage(
+                error.code === "23505"
+                  ? "That username is taken. Try another."
+                  : "Couldn’t save your username. Try again.",
+              );
+              return;
+            }
+            setName(username);
+            setSaved(username);
+            setMessage("Username saved.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label>
+          Username
+          <input
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={name}
+            disabled={!saved || busy}
+            maxLength={24}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <small>
+          3–24 letters, numbers or underscores. You’ll still sign in with your
+          email.
+        </small>
+        <div>
+          <button
+            disabled={!saved || busy || name.trim().toLowerCase() === saved}
+          >
+            Save username
+          </button>
+        </div>
+      </form>
+      {message && <p role="status">{message}</p>}
+      {!saved && message && (
+        <button onClick={() => setAttempt((a) => a + 1)}>Retry</button>
+      )}
+    </section>
+  );
+}
+async function signInByUsername(identifier: string, password: string) {
+  const { data, error } = await db!.functions.invoke("username-login", {
+    body: {
+      username: identifier.trim().replace(/^@/, "").toLowerCase(),
+      password,
+    },
+  });
+  if (error) {
+    const status = error.context?.status;
+    throw new Error(
+      status === 401
+        ? "Incorrect username or password."
+        : status === 429
+          ? "Too many attempts. Try again later."
+          : "Username sign-in is temporarily unavailable. Try your email.",
+    );
+  }
+  return db!.auth.setSession({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+  });
+}
 function Auth({
   configured,
   error: initialError,
@@ -630,6 +750,7 @@ function Auth({
 }) {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
+    [showPassword, setShowPassword] = useState(false),
     [signup, setSignup] = useState(false),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(initialError);
@@ -693,7 +814,7 @@ function Auth({
             <>
               <p>
                 {signup
-                  ? "Create your private account."
+                  ? "Create your account. You can customize your username in Settings."
                   : "Sign in to pick up where you left off."}
               </p>
               <form
@@ -704,14 +825,19 @@ function Auth({
                   try {
                     const result = signup
                       ? await db!.auth.signUp({
-                          email,
+                          email: email.trim(),
                           password,
                           options: {
                             emailRedirectTo:
                               location.origin + import.meta.env.BASE_URL,
                           },
                         })
-                      : await db!.auth.signInWithPassword({ email, password });
+                      : email.trim().includes("@", 1)
+                        ? await db!.auth.signInWithPassword({
+                            email: email.trim(),
+                            password,
+                          })
+                        : await signInByUsername(email, password);
                     if (result.error) throw result.error;
                     if (signup && !result.data.session)
                       setMessage(
@@ -725,26 +851,44 @@ function Auth({
                 }}
               >
                 <label>
-                  Email
+                  {signup ? "Email" : "Username or email"}
                   <input
-                    type="email"
-                    autoComplete="email"
+                    type={signup ? "email" : "text"}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    autoCorrect="off"
+                    autoComplete={signup ? "email" : "username"}
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </label>
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    minLength={8}
-                    autoComplete={signup ? "new-password" : "current-password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </label>
+                <div>
+                  <label htmlFor="account-password">Password</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      id="account-password"
+                      type={showPassword ? "text" : "password"}
+                      minLength={8}
+                      autoComplete={
+                        signup ? "new-password" : "current-password"
+                      }
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      aria-controls="account-password"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
                 <button className="primary full" disabled={busy}>
                   {busy ? "Connecting…" : signup ? "Create account" : "Sign in"}
                   <ArrowRight size={18} />
@@ -752,7 +896,10 @@ function Auth({
               </form>
               <button
                 className="text-button"
-                onClick={() => setSignup(!signup)}
+                onClick={() => {
+                  setShowPassword(false);
+                  setSignup(!signup);
+                }}
               >
                 {signup
                   ? "Already have an account? Sign in"

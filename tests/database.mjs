@@ -292,6 +292,51 @@ check(
   (await db.query("select * from models")).rows.length === 1,
   "Bundle restore is additive and idempotent",
 );
+await db.exec("reset role");
+await db.exec(
+  await fs.readFile("supabase/migrations/004_account_handles.sql", "utf8"),
+);
+check(
+  (
+    await db.query(
+      "select count(distinct username)::int as n from account_handles",
+    )
+  ).rows[0].n === 2,
+  "Existing accounts receive unique handles",
+);
+await db.query("insert into auth.users values ($1)", [id()]);
+check(
+  (await db.query("select count(*)::int as n from account_handles")).rows[0]
+    .n === 3,
+  "Signup assigns a handle",
+);
+await asUser(a);
+await db.query(
+  "update account_handles set username='training_log' where user_id=$1",
+  [a],
+);
+await asUser(b);
+check(
+  (await db.query("select * from account_handles")).rows.length === 1,
+  "Can only see own handle",
+);
+await assert.rejects(
+  db.query("update account_handles set username='training_log'"),
+  { code: "23505" },
+);
+await assert.rejects(
+  db.query("update account_handles set username='lifter_123'"),
+  { code: "42501" },
+);
+check(
+  (
+    await db.query(
+      "update account_handles set username='other_name' where user_id=$1 returning username",
+      [a],
+    )
+  ).rows.length === 0,
+  "Cannot rename another account",
+);
 await db.close();
 console.log(
   `\n${checks} PostgreSQL checks passed using PGlite. Hosted Auth/Storage still require live smoke tests.`,
