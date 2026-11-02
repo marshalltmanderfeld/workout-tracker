@@ -26,11 +26,13 @@ export function Workout({
   data,
   session,
   onSave,
+  practice = false,
   onSaveModel,
   onTemplate,
   onDelete,
   busy,
 }: {
+  practice?: boolean;
   data: Data;
   session: Session | undefined;
   onSave: (s: Session) => Promise<Session>;
@@ -58,6 +60,7 @@ export function Workout({
         }
       >
     >(() => {
+      if (practice) return {};
       try {
         return JSON.parse(
           localStorage.getItem("notebook-entry-" + session?.id) || "{}",
@@ -101,6 +104,7 @@ export function Workout({
     if (e && field) {
       const next = { ...inputs, [e.id]: { ...field, [key]: value } };
       setInputs(next);
+      if (practice) return;
       try {
         localStorage.setItem(
           "notebook-entry-" + draft?.id,
@@ -540,7 +544,13 @@ export function Workout({
               className="primary"
               disabled={locked}
               onClick={() => {
-                if (confirm("Finish and save this workout?"))
+                if (
+                  confirm(
+                    practice
+                      ? "Finish this test workout?"
+                      : "Finish and save this workout?",
+                  )
+                )
                   void action({
                     ...draft,
                     status: "completed",
@@ -847,7 +857,9 @@ export function Workout({
               </button>
               <div className="section-title">
                 <h3>Logged sets</h3>
-                <small>Saved to your account</small>
+                <small>
+                  {practice ? "Test sets" : "Saved to your account"}
+                </small>
               </div>
               <div className="table-wrap">
                 <table>

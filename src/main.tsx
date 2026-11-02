@@ -47,6 +47,7 @@ function App() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
+    [testing, setTesting] = useState(false),
     [page, setPage] = useState("Workout"),
     [view, setView] = useState<string | null>(null),
     [modelFilter, setModelFilter] = useState(""),
@@ -93,6 +94,7 @@ function App() {
   }
   useEffect(() => {
     userRef.current = user;
+    setTesting(false);
     setData(emptyData);
     setView(null);
     if (user) void reload();
@@ -193,6 +195,14 @@ function App() {
       </div>
     );
   if (!user) return <Auth configured={!!db} error={error} />;
+  if (testing)
+    return (
+      <PracticeWorkspace
+        key={user}
+        source={data}
+        onExit={() => setTesting(false)}
+      />
+    );
   const active = data.sessions.find((s) => s.status === "active");
   const session = view ? data.sessions.find((s) => s.id === view) : active;
   const nav = [
@@ -400,6 +410,21 @@ function App() {
                 <Gyms data={data} save={saveEntity} busy={busy} user={user} />
               )}{" "}
               {page === "Settings" && (
+                <section className="card">
+                  <h2>Test mode</h2>
+                  <p>
+                    Try logging a workout with your equipment. Practice sets
+                    disappear when you leave.
+                  </p>
+                  <button
+                    disabled={loading || busy}
+                    onClick={() => setTesting(true)}
+                  >
+                    Enter Test mode
+                  </button>
+                </section>
+              )}
+              {page === "Settings" && (
                 <Settings
                   data={data}
                   theme={theme}
@@ -431,6 +456,116 @@ function App() {
         </footer>
       </div>
     </div>
+  );
+}
+// This workspace owns its data and supplies only in-memory actions to the logger.
+function PracticeWorkspace({
+  source,
+  onExit,
+}: {
+  source: Data;
+  onExit: () => void;
+}) {
+  const [data, setData] = useState<Data>(() =>
+    structuredClone({ ...source, sessions: [] }),
+  );
+  const [tab, setTab] = useState("Workout");
+  const [view, setView] = useState<string | null>(null);
+  const active = data.sessions.find((s) => s.status === "active");
+  const selected = data.sessions.find((s) => s.id === view) || active;
+  async function save(s: Session) {
+    const saved = { ...s, revision: s.revision + 1 };
+    setData((d) => ({
+      ...d,
+      sessions: [...d.sessions.filter((x) => x.id !== s.id), saved],
+    }));
+    setView(saved.id);
+    return saved;
+  }
+  return (
+    <main>
+      <header
+        className="section-title card"
+        style={{ position: "sticky", top: 0, zIndex: 8 }}
+      >
+        <strong>Test mode</strong>
+        <button onClick={onExit}>Exit test mode</button>
+      </header>
+      <p>Practice workouts stay here until you exit or refresh.</p>
+      <nav aria-label="Test mode screens" className="actions">
+        {["Workout", "Journal", "Analytics"].map((name) => (
+          <button
+            key={name}
+            className={tab === name ? "primary" : ""}
+            onClick={() => {
+              setTab(name);
+              if (name === "Workout") setView(active?.id || null);
+            }}
+          >
+            {name}
+          </button>
+        ))}
+      </nav>
+      {tab === "Workout" && (
+        <Workout
+          key={selected?.id || "new"}
+          practice
+          data={data}
+          session={selected}
+          busy={false}
+          onSave={save}
+          onSaveModel={async (model) =>
+            setData((d) => ({ ...d, models: [...d.models, model] }))
+          }
+          onTemplate={async (s) => {
+            const name = prompt("Test routine name", s.name);
+            if (name?.trim())
+              setData((d) => ({
+                ...d,
+                templates: [
+                  ...d.templates,
+                  {
+                    id: uuid(),
+                    name: name.trim(),
+                    position: d.templates.length,
+                    scheduled_date: null,
+                    exercises: s.exercises.map((e) => ({
+                      ...e,
+                      id: uuid(),
+                      sets: [],
+                    })),
+                  },
+                ],
+              }));
+          }}
+          onDelete={async (id) => {
+            setData((d) => ({
+              ...d,
+              sessions: d.sessions.filter((s) => s.id !== id),
+            }));
+            setView(null);
+          }}
+        />
+      )}
+      {tab === "Journal" && (
+        <Journal
+          data={data}
+          onOpen={(s) => {
+            setView(s.id);
+            setTab("Workout");
+          }}
+          onDuplicate={async (s) => {
+            if (active) {
+              alert("Finish the current test workout first.");
+              return;
+            }
+            await save(duplicateSession(s));
+            setTab("Workout");
+          }}
+        />
+      )}
+      {tab === "Analytics" && <Analytics data={data} />}
+    </main>
   );
 }
 function Auth({
