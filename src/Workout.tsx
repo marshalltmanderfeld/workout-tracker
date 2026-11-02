@@ -6,7 +6,6 @@ import {
   ArrowDown,
   Trash2,
   ChevronRight,
-  Timer,
   Save,
   RotateCcw,
 } from "lucide-react";
@@ -138,7 +137,7 @@ export function Workout({
         ),
       });
   }
-  async function start(template?: Data["templates"][number]) {
+  async function start(template?: Data["templates"][number], first?: Exercise) {
     const g = data.gyms.find((x) => x.id === gym);
     if (!g) return setError("Create or select a gym first.");
     const s: Session = {
@@ -165,7 +164,7 @@ export function Workout({
             )?.id || null,
           sets: [],
           skipped: false,
-        })) || [],
+        })) || (first ? [first] : []),
     };
     await action(s);
   }
@@ -234,12 +233,17 @@ export function Workout({
     );
   }
   async function addMovement(model: Data["models"][number], name: string) {
-    if (!draft || pending || busy) return;
+    if (pending || busy) return;
     const instance = data.instances.find(
-      (i) => i.model_id === model.id && i.gym_id === draft.gym_id,
+      (i) =>
+        i.model_id === model.id && i.gym_id === (draft ? draft.gym_id : gym),
     );
     const next = newExercise(model, instance, name);
     next.primary = primaryFor(name, next.primary);
+    if (!draft) {
+      await start(undefined, next);
+      return;
+    }
     try {
       await commit({ ...draft, exercises: [...draft.exercises, next] });
       showLogger(draft.exercises.length);
@@ -255,7 +259,8 @@ export function Workout({
     ({ name }) => normalized(name) === normalized(typedName),
   );
   async function createMovement() {
-    if (!typedName || !draft || busy || pending) return;
+    if (!typedName || busy || pending) return;
+    if (!draft && !gym) return setError("Choose a gym first.");
     const model: Data["models"][number] = {
       id: uuid(),
       name: typedName,
@@ -330,80 +335,147 @@ export function Workout({
     ...ordered.slice(nextIndex),
     ...ordered.slice(0, nextIndex),
   ];
+  const exerciseSearch = (
+    <div
+      ref={finderRef}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          setFinderOpen(false);
+          event.currentTarget.querySelector("input")?.blur();
+        }
+      }}
+    >
+      <label htmlFor="movement-search">Find or add an exercise</label>
+      <input
+        id="movement-search"
+        type="search"
+        enterKeyHint="go"
+        maxLength={200}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            submitSearch();
+          }
+        }}
+        placeholder="Search exercises, e.g. lat pulldown"
+        value={query}
+        aria-expanded={finderOpen}
+        aria-controls="movement-results"
+        onFocus={() => setFinderOpen(true)}
+        onClick={() => setFinderOpen(true)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setFinderOpen(true);
+        }}
+      />
+      {finderOpen && (
+        <div id="movement-results" className="movement-results">
+          <button
+            type="button"
+            onClick={() => {
+              setFinderOpen(false);
+              setQuery("");
+            }}
+          >
+            Close search
+          </button>
+          {inSession.length > 0 && <h3>In this workout</h3>}
+          {inSession.map(({ exercise, index }) => (
+            <button
+              className="routine"
+              key={exercise.id}
+              disabled={locked}
+              onClick={() => showLogger(index)}
+            >
+              <span>
+                <b>{exercise.name}</b>
+                <small>
+                  {exercise.equipment_name} · {exercise.sets.length} sets
+                </small>
+              </span>
+              Open
+            </button>
+          ))}
+          {available.length > 0 && <h3>Add to workout</h3>}
+          {available.map(({ model, name }) => (
+            <button
+              className="routine"
+              key={model.id + ":" + name}
+              disabled={locked}
+              onClick={() => addMovement(model, name)}
+            >
+              <span>
+                <b>{name}</b>
+                <small>{model.nickname || model.name}</small>
+              </span>
+              <span>+ Add</span>
+            </button>
+          ))}
+          {typedName && !exactSession.length && !exactCatalog.length && (
+            <button
+              className="routine"
+              disabled={locked}
+              onClick={createMovement}
+            >
+              + Create “{typedName}” and add to workout
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
   if (!draft)
     return (
       <>
         <div className="page-heading">
           <div>
-            <p className="eyebrow">YOUR NEXT SESSION</p>
-            <h1>Make today count.</h1>
-            <p>Your rotation follows you. No fixed weekdays required.</p>
+            <h1>Log an exercise</h1>
+            <p>Pick your first movement to start logging sets.</p>
           </div>
         </div>
-        <div className="grid two">
-          <section className="card hero">
-            <span className="pill">
-              <Timer size={14} /> READY WHEN YOU ARE
-            </span>
-            <h2>
-              A fresh start.
-              <br />
-              One set at a time.
-            </h2>
-            <p>
-              Choose a routine or start an open workout. Every logged set saves
-              to your private account.
-            </p>
-            <label>
-              Where are you training?
-              <select value={gym} onChange={(e) => setGym(e.target.value)}>
-                {data.gyms.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="primary"
-              disabled={locked}
-              onClick={() => start()}
-            >
-              <Plus size={18} /> Start open workout
-            </button>
-          </section>
-          <section className="card">
-            <p className="eyebrow">YOUR ROTATION</p>
-            <h2>Pick up where you left off</h2>
-            {!data.templates.length ? (
-              <div className="empty">
-                Create your first routine by saving a workout as a template, or
-                import a routine in Settings.
-              </div>
-            ) : (
-              rotation.map((t, i) => (
-                <button
-                  className="routine"
-                  key={t.id}
-                  disabled={locked}
-                  onClick={() => start(t)}
-                >
-                  <span>
-                    <b>
-                      {t.name}
-                      {i === 0 ? " · Up next" : ""}
-                    </b>
-                    <small>
-                      {t.exercises.length} exercises
-                      {t.scheduled_date ? ` · Planned ${t.scheduled_date}` : ""}
-                    </small>
-                  </span>
-                  <ChevronRight />
-                </button>
-              ))
-            )}
-          </section>
-        </div>
+        <section className="card">
+          {exerciseSearch}
+          <label>
+            Where are you training?
+            <select value={gym} onChange={(e) => setGym(e.target.value)}>
+              {data.gyms.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+        <details className="card">
+          <summary>Use a saved routine</summary>
+          {!data.templates.length ? (
+            <div className="empty">
+              Create your first routine by saving a workout as a template, or
+              import a routine in Settings.
+            </div>
+          ) : (
+            rotation.map((t, i) => (
+              <button
+                className="routine"
+                key={t.id}
+                disabled={locked}
+                onClick={() => start(t)}
+              >
+                <span>
+                  <b>
+                    {t.name}
+                    {i === 0 ? " · Up next" : ""}
+                  </b>
+                  <small>
+                    {t.exercises.length} exercises
+                    {t.scheduled_date ? ` · Planned ${t.scheduled_date}` : ""}
+                  </small>
+                </span>
+                <ChevronRight />
+              </button>
+            ))
+          )}
+        </details>
         {error && (
           <p role="alert" className="error">
             {error}
@@ -470,95 +542,7 @@ export function Workout({
         </div>
       )}
       <div className="workout-layout">
-        <aside className="card movement-picker">
-          <div
-            ref={finderRef}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setFinderOpen(false);
-                event.currentTarget.querySelector("input")?.blur();
-              }
-            }}
-          >
-            <label htmlFor="movement-search">Find or add an exercise</label>
-            <input
-              id="movement-search"
-              type="search"
-              enterKeyHint="go"
-              maxLength={200}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  submitSearch();
-                }
-              }}
-              placeholder="Search exercises, e.g. lat pulldown"
-              value={query}
-              aria-expanded={finderOpen}
-              aria-controls="movement-results"
-              onFocus={() => setFinderOpen(true)}
-              onClick={() => setFinderOpen(true)}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setFinderOpen(true);
-              }}
-            />
-            {finderOpen && (
-              <div id="movement-results" className="movement-results">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFinderOpen(false);
-                    setQuery("");
-                  }}
-                >
-                  Close search
-                </button>
-                {inSession.length > 0 && <h3>In this workout</h3>}
-                {inSession.map(({ exercise, index }) => (
-                  <button
-                    className="routine"
-                    key={exercise.id}
-                    disabled={locked}
-                    onClick={() => showLogger(index)}
-                  >
-                    <span>
-                      <b>{exercise.name}</b>
-                      <small>
-                        {exercise.equipment_name} · {exercise.sets.length} sets
-                      </small>
-                    </span>
-                    Open
-                  </button>
-                ))}
-                {available.length > 0 && <h3>Add to workout</h3>}
-                {available.map(({ model, name }) => (
-                  <button
-                    className="routine"
-                    key={model.id + ":" + name}
-                    disabled={locked}
-                    onClick={() => addMovement(model, name)}
-                  >
-                    <span>
-                      <b>{name}</b>
-                      <small>{model.nickname || model.name}</small>
-                    </span>
-                    <span>+ Add</span>
-                  </button>
-                ))}
-                {typedName && !exactSession.length && !exactCatalog.length && (
-                  <button
-                    className="routine"
-                    disabled={locked}
-                    onClick={createMovement}
-                  >
-                    + Create “{typedName}” and add to workout
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
+        <aside className="card movement-picker">{exerciseSearch}</aside>
         <section ref={loggerRef} className="card logger">
           {e && field ? (
             <>
