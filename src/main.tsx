@@ -223,13 +223,15 @@ function App() {
           </span>
         </a>
         <p className="nav-label">YOUR TRAINING</p>
-        <nav>
+        <nav aria-label="Main navigation">
           {nav.map(([label, Icon]) => (
             <button
               key={label}
+              aria-current={page === label ? "page" : undefined}
               className={page === label ? "active" : ""}
               onClick={() => {
                 setPage(label);
+                window.scrollTo({ top: 0, behavior: "instant" });
                 if (label === "Workout") setView(null);
               }}
             >
@@ -264,7 +266,8 @@ function App() {
       </aside>
       <div className="main">
         <header className="topbar">
-          <span>YOUR TRAINING. YOUR PACE.</span>
+          <span className="desktop-tagline">YOUR TRAINING. YOUR PACE.</span>
+          <strong className="mobile-page-title">{page}</strong>
           <div className="actions">
             <button
               aria-label="Sign out"
