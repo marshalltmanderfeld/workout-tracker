@@ -337,6 +337,54 @@ check(
   ).rows.length === 0,
   "Cannot rename another account",
 );
+await db.exec("reset role");
+await db.exec(
+  await fs.readFile(
+    "supabase/migrations/005_handle_capitalization.sql",
+    "utf8",
+  ),
+);
+await asUser(a);
+const renamed = (
+  await db.query(
+    "update account_handles set username='Training_Log' returning username, display_username",
+  )
+).rows[0];
+check(
+  renamed.username === "training_log" &&
+    renamed.display_username === "Training_Log",
+  "Capitalization-only edit preserves the sign-in handle",
+);
+await asUser(b);
+await assert.rejects(
+  db.query("update account_handles set username='TRAINING_LOG'"),
+  { code: "23505" },
+);
+const generated = (
+  await db.query(
+    "update account_handles set username=upper(username) returning username, display_username",
+  )
+).rows[0];
+check(
+  generated.display_username === generated.username.toUpperCase(),
+  "Generated handles can change their capitalization",
+);
+await assert.rejects(
+  db.query("update account_handles set username='LIFTER_123'"),
+  { code: "42501" },
+);
+await db.exec("reset role");
+const newcomer = id();
+await db.query("insert into auth.users values ($1)", [newcomer]);
+check(
+  (
+    await db.query(
+      "select username=display_username as matches from account_handles where user_id=$1",
+      [newcomer],
+    )
+  ).rows[0].matches,
+  "New signup receives a display handle",
+);
 await db.close();
 console.log(
   `\n${checks} PostgreSQL checks passed using PGlite. Hosted Auth/Storage still require live smoke tests.`,

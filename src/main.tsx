@@ -633,15 +633,15 @@ function AccountUsername({ user }: { user: string }) {
     setMessage("");
     void db!
       .from("account_handles")
-      .select("username")
+      .select("display_username")
       .eq("user_id", user)
       .single()
       .then(({ data, error }) => {
         if (!current) return;
         if (error) setMessage("Couldn’t load your username.");
         else {
-          setSaved(data.username);
-          setName(data.username);
+          setSaved(data.display_username);
+          setName(data.display_username);
         }
       });
     return () => {
@@ -654,10 +654,11 @@ function AccountUsername({ user }: { user: string }) {
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          const username = name.trim().toLowerCase();
+          const username = name.trim();
           if (
-            !/^[a-z0-9_]{3,24}$/.test(username) ||
-            /^lifter_[0-9]+$/.test(username)
+            !/^[A-Za-z0-9_]{3,24}$/.test(username) ||
+            (/^lifter_[0-9]+$/i.test(username) &&
+              username.toLowerCase() !== saved.toLowerCase())
           ) {
             setMessage(
               "Use 3–24 letters, numbers or underscores. Names like lifter_123 are reserved.",
@@ -670,7 +671,7 @@ function AccountUsername({ user }: { user: string }) {
               .from("account_handles")
               .update({ username })
               .eq("user_id", user)
-              .select("username")
+              .select("display_username")
               .single();
             if (error) {
               setMessage(
@@ -701,13 +702,11 @@ function AccountUsername({ user }: { user: string }) {
           />
         </label>
         <small>
-          3–24 letters, numbers or underscores. You’ll still sign in with your
-          email.
+          Your username displays as typed. Capitalization is optional when
+          signing in.
         </small>
         <div>
-          <button
-            disabled={!saved || busy || name.trim().toLowerCase() === saved}
-          >
+          <button disabled={!saved || busy || name.trim() === saved}>
             Save username
           </button>
         </div>
