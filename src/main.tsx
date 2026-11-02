@@ -47,6 +47,8 @@ function App() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
+    [admin, setAdmin] = useState<{ id: string; name: string } | null>(null),
+    [adminMode, setAdminMode] = useState(false),
     [testing, setTesting] = useState(false),
     [page, setPage] = useState("Workout"),
     [view, setView] = useState<string | null>(null),
@@ -95,9 +97,33 @@ function App() {
   useEffect(() => {
     userRef.current = user;
     setTesting(false);
+    setAdminMode(false);
+    setAdmin(null);
+    let current = true;
+    if (user && db) {
+      void db.auth
+        .getUser()
+        .then(({ data: { user: account } }) => {
+          if (
+            current &&
+            account?.id === user &&
+            account.app_metadata.workout_tracker_role === "admin"
+          ) {
+            setAdmin({
+              id: user,
+              name:
+                account.app_metadata.workout_tracker_display_name || "Account",
+            });
+          }
+        })
+        .catch(() => {});
+    }
     setData(emptyData);
     setView(null);
     if (user) void reload();
+    return () => {
+      current = false;
+    };
   }, [user]);
   async function run<T>(job: () => Promise<T>): Promise<T> {
     if (lock.current)
@@ -195,7 +221,8 @@ function App() {
       </div>
     );
   if (!user) return <Auth configured={!!db} error={error} />;
-  if (testing)
+  const isAdmin = admin?.id === user;
+  if (isAdmin && adminMode && testing)
     return (
       <PracticeWorkspace
         key={user}
@@ -252,6 +279,14 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {isAdmin && (
+            <p>
+              <strong>{admin.name}</strong>{" "}
+              <span className="pill">
+                <ShieldCheck size={14} /> Admin
+              </span>
+            </p>
+          )}
           <div className="private">
             <ShieldCheck size={17} />
             <span>
@@ -409,19 +444,37 @@ function App() {
               {page === "Gyms" && (
                 <Gyms data={data} save={saveEntity} busy={busy} user={user} />
               )}{" "}
-              {page === "Settings" && (
+              {page === "Settings" && isAdmin && (
                 <section className="card">
-                  <h2>Test mode</h2>
-                  <p>
-                    Try logging a workout with your equipment. Practice sets
-                    disappear when you leave.
-                  </p>
-                  <button
-                    disabled={loading || busy}
-                    onClick={() => setTesting(true)}
-                  >
-                    Enter Test mode
-                  </button>
+                  <div className="section-title">
+                    <h2>{admin.name}</h2>
+                    <span className="pill">
+                      <ShieldCheck size={15} /> Admin
+                    </span>
+                  </div>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={adminMode}
+                      onChange={(event) => setAdminMode(event.target.checked)}
+                    />{" "}
+                    Admin mode
+                  </label>
+                  {adminMode && (
+                    <>
+                      <h3>Test mode</h3>
+                      <p>
+                        Try logging a workout with your equipment. Practice sets
+                        disappear when you leave.
+                      </p>
+                      <button
+                        disabled={loading || busy}
+                        onClick={() => setTesting(true)}
+                      >
+                        Enter Test mode
+                      </button>
+                    </>
+                  )}
                 </section>
               )}
               {page === "Settings" && (
