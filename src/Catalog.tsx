@@ -14,7 +14,8 @@ export function Photo({ path }: { path: string | null }) {
   const [url, setURL] = useState("");
   useEffect(() => {
     setURL("");
-    if (path)
+    if (path?.startsWith("blob:")) setURL(path);
+    else if (path)
       photoURL(path)
         .then(setURL)
         .catch(() => {});
@@ -66,11 +67,13 @@ export function Stars({
 export function Catalog({
   data,
   save,
+  upload = uploadPhoto,
   user,
   busy,
   onHistory,
 }: {
   data: Data;
+  upload?: typeof uploadPhoto;
   save: (table: string, value: any) => Promise<void>;
   user: string;
   busy: boolean;
@@ -333,7 +336,7 @@ export function Catalog({
                     if (file) {
                       setUploading(true);
                       try {
-                        update({ photo: await uploadPhoto(file, user) });
+                        update({ photo: await upload(file, user) });
                       } catch (err) {
                         setError(String(err));
                       } finally {
@@ -367,10 +370,12 @@ export function Catalog({
 export function Gyms({
   data,
   save,
+  upload = uploadPhoto,
   busy,
   user,
 }: {
   data: Data;
+  upload?: typeof uploadPhoto;
   save: (table: string, value: any) => Promise<void>;
   busy: boolean;
   user: string;
@@ -560,7 +565,7 @@ export function Gyms({
                     try {
                       setEdit({
                         ...edit,
-                        photo: await uploadPhoto(file, user),
+                        photo: await upload(file, user),
                       });
                     } catch (err) {
                       setError(String(err));

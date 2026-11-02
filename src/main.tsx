@@ -12,19 +12,11 @@ import {
   ArrowRight,
   ShieldCheck,
 } from "lucide-react";
-import {
-  db,
-  loadData,
-  saveSession,
-  upsert,
-  removeSession,
-  importSessions,
-  importBundle,
-} from "./api";
+import { db, importBundle } from "./api";
 import {
   type Data,
   type Session,
-  type Template,
+  workoutError,
   emptyData,
   uuid,
   duplicateSession,
@@ -39,35 +31,69 @@ import { Catalog, Gyms } from "./Catalog";
 import { Analytics, Journal } from "./Analytics";
 import { Settings } from "./Settings";
 import "./style.css";
+import { practiceStore } from "./practice";
+import * as live from "./api";
 function App() {
   const [user, setUser] = useState<string | null>(null),
     [authReady, setAuthReady] = useState(!db),
-    [data, setData] = useState<Data>(emptyData),
+    [liveData, setLiveData] = useState<Data>(emptyData),
+    [practiceData, setPracticeData] = useState<Data>(emptyData),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [admin, setAdmin] = useState<{ id: string; name: string } | null>(null),
     [adminMode, setAdminMode] = useState(false),
-    [testing, setTesting] = useState(false),
+    [sandbox, setSandbox] = useState<ReturnType<typeof practiceStore> | null>(
+      null,
+    ),
+    [practiceTheme, setPracticeTheme] = useState("system"),
+    [practiceName, setPracticeName] = useState<string | null>(null),
     [page, setPage] = useState("Workout"),
     [view, setView] = useState<string | null>(null),
     [modelFilter, setModelFilter] = useState(""),
     [theme, setTheme] = useState(
       localStorage.getItem("notebook-theme") || "system",
     );
+  const testing = !!sandbox && !!user && admin?.id === user && adminMode;
+  const store = testing ? sandbox : live;
+  const data = testing ? practiceData : liveData;
+  const setData = testing ? setPracticeData : setLiveData;
+  const displayTheme = testing ? practiceTheme : theme;
+  function switchMode(enable: boolean) {
+    if (enable && adminMode && admin?.id === user) {
+      setPracticeData(structuredClone(liveData));
+      setSandbox(practiceStore(liveData));
+      setPracticeTheme(theme);
+      setPracticeName(null);
+      setPage("Workout");
+    } else {
+      setSandbox(null);
+      setPage("Settings");
+    }
+    setView(null);
+    setError("");
+    setNotice("");
+    setModelFilter("");
+    window.scrollTo(0, 0);
+  }
+  useEffect(() => () => sandbox?.dispose(), [sandbox]);
   const lock = useRef(false);
   const userRef = useRef<string | null>(null);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const apply = () =>
       (document.documentElement.dataset.theme =
-        theme === "system" ? (media.matches ? "dark" : "light") : theme);
+        displayTheme === "system"
+          ? media.matches
+            ? "dark"
+            : "light"
+          : displayTheme);
     apply();
     localStorage.setItem("notebook-theme", theme);
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
-  }, [theme]);
+  }, [theme, displayTheme]);
   useEffect(() => {
     if (!db) return;
     db.auth.getSession().then(({ data, error }) => {
@@ -86,7 +112,7 @@ function App() {
     if (!current) return;
     setLoading(true);
     try {
-      const next = await loadData();
+      const next = await store.loadData();
       if (userRef.current === current) setData(next);
     } catch (e) {
       setError(String(e));
@@ -96,7 +122,7 @@ function App() {
   }
   useEffect(() => {
     userRef.current = user;
-    setTesting(false);
+    setSandbox(null);
     setAdminMode(false);
     setAdmin(null);
     let current = true;
@@ -118,14 +144,14 @@ function App() {
         })
         .catch(() => {});
     }
-    setData(emptyData);
+    setLiveData(emptyData);
     setView(null);
     if (user) void reload();
     return () => {
       current = false;
     };
   }, [user]);
-  async function run<T>(job: () => Promise<T>): Promise<T> {
+  async function run<T>(job: () => Promise<T>, reportError = true): Promise<T> {
     if (lock.current)
       throw Error("A save is already in progress. Please wait.");
     lock.current = true;
@@ -134,28 +160,27 @@ function App() {
     setNotice("");
     try {
       const value = await job();
-      setNotice("Saved to your account");
+      setNotice(testing ? "Saved in Test mode" : "Saved to your account");
       return value;
     } catch (e) {
-      const message =
-        e instanceof Error ? e.message : (e as any)?.message || String(e);
-      setError(message);
+      const message = workoutError(e);
+      if (reportError) setError(message);
       throw e;
     } finally {
       lock.current = false;
       setBusy(false);
     }
   }
-  async function save(s: Session) {
+  async function save(s: Session, reportError = true) {
     return run(async () => {
-      const saved = await saveSession(s);
+      const saved = await store.saveSession(s);
       setData((d) => ({
         ...d,
         sessions: [...d.sessions.filter((x) => x.id !== s.id), saved],
       }));
       if (s.status === "completed") setView(s.id);
       return saved;
-    });
+    }, reportError);
   }
   async function saveEntity(table: string, value: any) {
     const schemas: any = {
@@ -166,7 +191,7 @@ function App() {
     };
     const parsed = schemas[table].parse(value);
     return run(async () => {
-      await upsert(table, parsed);
+      await store.upsert(table, parsed);
       setData((d) => ({
         ...d,
         [table]: [
@@ -179,6 +204,7 @@ function App() {
     });
   }
   async function initialize() {
+    if (testing) return;
     return run(async () => {
       const key = `notebook-init-${user}`;
       let payload = localStorage.getItem(key);
@@ -222,14 +248,6 @@ function App() {
     );
   if (!user) return <Auth configured={!!db} error={error} />;
   const isAdmin = admin?.id === user;
-  if (isAdmin && adminMode && testing)
-    return (
-      <PracticeWorkspace
-        key={user}
-        source={data}
-        onExit={() => setTesting(false)}
-      />
-    );
   const active = data.sessions.find((s) => s.status === "active");
   const session = view ? data.sessions.find((s) => s.id === view) : active;
   const nav = [
@@ -241,7 +259,7 @@ function App() {
     ["Settings", SettingsIcon],
   ] as const;
   return (
-    <div className="app">
+    <div className="app" key={testing ? "test" : "normal"}>
       <aside className="sidebar">
         <a
           className="brand"
@@ -296,6 +314,7 @@ function App() {
           <button
             disabled={busy}
             onClick={async () => {
+              if (testing) return switchMode(false);
               const { error } = await db!.auth.signOut();
               if (!error) {
                 Object.keys(localStorage)
@@ -311,6 +330,11 @@ function App() {
       </aside>
       <div className="main">
         <header className="topbar">
+          {testing && (
+            <button disabled={busy} onClick={() => switchMode(false)}>
+              Test mode · Exit
+            </button>
+          )}
           <span className="desktop-tagline">YOUR TRAINING. YOUR PACE.</span>
           <strong className="mobile-page-title">{page}</strong>
           <div className="actions">
@@ -318,6 +342,7 @@ function App() {
               aria-label="Sign out"
               disabled={busy}
               onClick={async () => {
+                if (testing) return switchMode(false);
                 const r = await db!.auth.signOut();
                 if (r.error) setError(r.error.message);
                 else
@@ -347,7 +372,15 @@ function App() {
             {error && <div className="error">{error}</div>}
             {notice && <div className="toast">{notice}</div>}
           </div>
-          {page === "Settings" && <AccountUsername key={user} user={user} />}
+          {page === "Settings" && (
+            <AccountUsername
+              key={user}
+              user={user}
+              practice={testing}
+              temporaryName={practiceName}
+              onPracticeName={setPracticeName}
+            />
+          )}
           {loading && !data.gyms.length ? (
             <div className="empty">Loading your training space…</div>
           ) : !data.models.length ? (
@@ -378,7 +411,8 @@ function App() {
                   data={data}
                   session={session}
                   busy={busy}
-                  onSave={save}
+                  practice={testing}
+                  onSave={(s) => save(s, false)}
                   onSaveModel={(model) => saveEntity("models", model)}
                   onTemplate={async (s) => {
                     const name = prompt("Routine name", s.name);
@@ -397,7 +431,7 @@ function App() {
                   }}
                   onDelete={(id) =>
                     run(async () => {
-                      await removeSession(id);
+                      await store.removeSession(id);
                       setData((d) => ({
                         ...d,
                         sessions: d.sessions.filter((x) => x.id !== id),
@@ -436,6 +470,7 @@ function App() {
                   save={saveEntity}
                   user={user}
                   busy={busy}
+                  upload={store.uploadPhoto}
                   onHistory={(id) => {
                     setModelFilter(id);
                     setPage("Analytics");
@@ -443,7 +478,13 @@ function App() {
                 />
               )}
               {page === "Gyms" && (
-                <Gyms data={data} save={saveEntity} busy={busy} user={user} />
+                <Gyms
+                  upload={store.uploadPhoto}
+                  data={data}
+                  save={saveEntity}
+                  busy={busy}
+                  user={user}
+                />
               )}{" "}
               {page === "Settings" && isAdmin && (
                 <section className="card">
@@ -457,7 +498,10 @@ function App() {
                     <input
                       type="checkbox"
                       checked={adminMode}
-                      onChange={(event) => setAdminMode(event.target.checked)}
+                      onChange={(event) => {
+                        if (testing) switchMode(false);
+                        setAdminMode(event.target.checked);
+                      }}
                     />{" "}
                     Admin mode
                   </label>
@@ -470,9 +514,9 @@ function App() {
                       </p>
                       <button
                         disabled={loading || busy}
-                        onClick={() => setTesting(true)}
+                        onClick={() => switchMode(!testing)}
                       >
-                        Enter Test mode
+                        {testing ? "Exit Test mode" : "Enter Test mode"}
                       </button>
                     </>
                   )}
@@ -481,13 +525,13 @@ function App() {
               {page === "Settings" && (
                 <Settings
                   data={data}
-                  theme={theme}
-                  setTheme={setTheme}
+                  theme={displayTheme}
+                  setTheme={testing ? setPracticeTheme : setTheme}
                   busy={busy}
                   save={saveEntity}
                   onImport={(sessions) =>
                     run(async () => {
-                      const count = await importSessions(sessions);
+                      const count = await store.importSessions(sessions);
                       await reload();
                       setNotice(
                         `${count} sessions imported; duplicates skipped.`,
@@ -496,7 +540,7 @@ function App() {
                   }
                   onBundle={(bundle) =>
                     run(async () => {
-                      await importBundle(bundle);
+                      await store.importBundle(bundle);
                       await reload();
                     })
                   }
@@ -512,117 +556,17 @@ function App() {
     </div>
   );
 }
-// This workspace owns its data and supplies only in-memory actions to the logger.
-function PracticeWorkspace({
-  source,
-  onExit,
+function AccountUsername({
+  user,
+  practice,
+  temporaryName,
+  onPracticeName,
 }: {
-  source: Data;
-  onExit: () => void;
+  user: string;
+  practice: boolean;
+  temporaryName: string | null;
+  onPracticeName: (name: string) => void;
 }) {
-  const [data, setData] = useState<Data>(() =>
-    structuredClone({ ...source, sessions: [] }),
-  );
-  const [tab, setTab] = useState("Workout");
-  const [view, setView] = useState<string | null>(null);
-  const active = data.sessions.find((s) => s.status === "active");
-  const selected = data.sessions.find((s) => s.id === view) || active;
-  async function save(s: Session) {
-    const saved = { ...s, revision: s.revision + 1 };
-    setData((d) => ({
-      ...d,
-      sessions: [...d.sessions.filter((x) => x.id !== s.id), saved],
-    }));
-    setView(saved.id);
-    return saved;
-  }
-  return (
-    <main>
-      <header
-        className="section-title card"
-        style={{ position: "sticky", top: 0, zIndex: 8 }}
-      >
-        <strong>Test mode</strong>
-        <button onClick={onExit}>Exit test mode</button>
-      </header>
-      <p>Practice workouts stay here until you exit or refresh.</p>
-      <nav aria-label="Test mode screens" className="actions">
-        {["Workout", "Journal", "Analytics"].map((name) => (
-          <button
-            key={name}
-            className={tab === name ? "primary" : ""}
-            onClick={() => {
-              setTab(name);
-              if (name === "Workout") setView(active?.id || null);
-            }}
-          >
-            {name}
-          </button>
-        ))}
-      </nav>
-      {tab === "Workout" && (
-        <Workout
-          key={selected?.id || "new"}
-          practice
-          data={data}
-          session={selected}
-          busy={false}
-          onSave={save}
-          onSaveModel={async (model) =>
-            setData((d) => ({ ...d, models: [...d.models, model] }))
-          }
-          onTemplate={async (s) => {
-            const name = prompt("Test routine name", s.name);
-            if (name?.trim())
-              setData((d) => ({
-                ...d,
-                templates: [
-                  ...d.templates,
-                  {
-                    id: uuid(),
-                    name: name.trim(),
-                    position: d.templates.length,
-                    scheduled_date: null,
-                    exercises: s.exercises.map((e) => ({
-                      ...e,
-                      id: uuid(),
-                      sets: [],
-                    })),
-                  },
-                ],
-              }));
-          }}
-          onDelete={async (id) => {
-            setData((d) => ({
-              ...d,
-              sessions: d.sessions.filter((s) => s.id !== id),
-            }));
-            setView(null);
-          }}
-        />
-      )}
-      {tab === "Journal" && (
-        <Journal
-          data={data}
-          onOpen={(s) => {
-            setView(s.id);
-            setTab("Workout");
-          }}
-          onDuplicate={async (s) => {
-            if (active) {
-              alert("Finish the current test workout first.");
-              return;
-            }
-            await save(duplicateSession(s));
-            setTab("Workout");
-          }}
-        />
-      )}
-      {tab === "Analytics" && <Analytics data={data} />}
-    </main>
-  );
-}
-function AccountUsername({ user }: { user: string }) {
   const [saved, setSaved] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -631,6 +575,11 @@ function AccountUsername({ user }: { user: string }) {
   useEffect(() => {
     let current = true;
     setMessage("");
+    if (practice && temporaryName) {
+      setSaved(temporaryName);
+      setName(temporaryName);
+      return;
+    }
     void db!
       .from("account_handles")
       .select("display_username")
@@ -647,7 +596,7 @@ function AccountUsername({ user }: { user: string }) {
     return () => {
       current = false;
     };
-  }, [user, attempt]);
+  }, [user, attempt, practice, temporaryName]);
   return (
     <section className="card">
       <h2>{saved ? "@" + saved : "Username"}</h2>
@@ -663,6 +612,11 @@ function AccountUsername({ user }: { user: string }) {
             setMessage(
               "Use 3–24 letters, numbers or underscores. Names like lifter_123 are reserved.",
             );
+            return;
+          }
+          if (practice) {
+            onPracticeName(username);
+            setMessage("Saved in Test mode");
             return;
           }
           setBusy(true);

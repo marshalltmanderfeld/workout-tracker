@@ -18,6 +18,7 @@ import {
   localDate,
   newExercise,
   previousPerformance,
+  workoutError,
   duplicateSession,
   sessionSchema,
 } from "./domain";
@@ -113,7 +114,10 @@ export function Workout({
       } catch {}
     }
   }
-  const preparing = !!draft && !session && draft.started_at === null;
+  const preparing =
+    !!draft &&
+    draft.status === "active" &&
+    !draft.exercises.some((x) => x.sets.some((s) => s.completed));
   async function commit(next: Session) {
     if (!session && next.started_at === null) {
       setDraft(next);
@@ -127,7 +131,7 @@ export function Workout({
       setDraft(saved);
       return saved;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(workoutError(err));
       throw err;
     } finally {
       setPending(false);
@@ -207,7 +211,7 @@ export function Workout({
       await commit(next);
       input("notes", "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(workoutError(err));
     }
   }
   useEffect(() => {
@@ -517,7 +521,7 @@ export function Workout({
           <h1>{preparing ? "Log your first set" : draft.name}</h1>
           <p>
             {draft.date} ·{" "}
-            {draft.started_at && draft.status === "active"
+            {!preparing && draft.started_at && draft.status === "active"
               ? Math.max(
                   0,
                   Math.floor(
@@ -566,10 +570,7 @@ export function Workout({
       {error && (
         <div role="alert" className="error">
           {error}
-          <p>
-            Your failed change was not saved. Retry or reload to resolve a
-            conflict.
-          </p>
+          <p>Your change was not saved.</p>
         </div>
       )}
       <div className="workout-layout">
@@ -1007,7 +1008,7 @@ export function Workout({
           className="danger"
           disabled={locked}
           onClick={() => {
-            if (preparing) {
+            if (preparing && !session) {
               setDraft(undefined);
               setSelected(0);
               setInputs({});
@@ -1046,7 +1047,7 @@ export function Workout({
                 await commit(next);
                 setEditing(null);
               } catch (err) {
-                setError(String(err));
+                setError(workoutError(err));
               }
             }}
           >

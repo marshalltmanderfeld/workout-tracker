@@ -74,13 +74,16 @@ export const exerciseSchema = z.object({
   notes: note,
   sets: z.array(setSchema).max(200),
 });
+const workoutTime = z.iso
+  .datetime({ offset: true })
+  .transform((value) => new Date(value).toISOString());
 export const sessionSchema = z
   .object({
     id,
     name: short,
     date: z.iso.date(),
-    started_at: z.iso.datetime().nullable().default(null),
-    ended_at: z.iso.datetime().nullable().default(null),
+    started_at: workoutTime.nullable().default(null),
+    ended_at: workoutTime.nullable().default(null),
     gym_id: id.nullable(),
     gym_name: z.string().max(200).default("Not recorded"),
     status: z.enum(["active", "completed"]),
@@ -374,3 +377,14 @@ export const backupSchema = z.object({
   templates: z.array(templateSchema),
   sessions: z.array(sessionSchema),
 });
+
+export function workoutError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const key = String(issue.path.at(-1) || "workout").replaceAll("_", " ");
+    return "Check the " + key + " value and try again.";
+  }
+  return error instanceof Error
+    ? error.message
+    : String((error as { message?: string })?.message || error);
+}
