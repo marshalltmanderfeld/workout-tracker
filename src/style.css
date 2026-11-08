@@ -1422,3 +1422,43 @@ button svg, .button svg { flex-shrink: 0; }
   .movement-picker label { font-size: 12px; }
   .workout-layout .logger { scroll-margin-top: calc(156px + env(safe-area-inset-top)); }
 }
+
+
+/* Workout navigation, search, and editable session history */
+.workout-exercise-nav { display: grid; gap: 6px; margin: 12px 0 20px; }
+.workout-exercise-nav-item { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+.workout-exercise-nav-item.current { border-color: var(--accent); background: var(--soft); }
+.workout-exercise-nav-item > button:first-child { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; min-width: 0; padding: 10px 12px; text-align: left; background: none; border: 0; }
+.workout-exercise-nav-item b { font-size: 13px; }
+.workout-exercise-nav-item small { font-size: 11px; color: var(--muted); }
+.workout-exercise-nav-item .icon-remove { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 10px; }
+.exercise-finder { position: relative; }
+.exercise-finder > label { display: flex; align-items: center; gap: 7px; }
+.exercise-finder > input { width: 100%; }
+.exercise-finder .movement-results { margin-top: 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: 0 8px 24px #00000010; padding: 8px; }
+.session-exercise-cards { display: grid; gap: 12px; margin: 20px 0; }
+.session-exercise-card { padding: 15px; border: 1px solid var(--border); border-radius: 13px; }
+.session-exercise-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.session-exercise-head > div:first-child { display: grid; gap: 4px; }
+.session-exercise-head b { font-size: 15px; }
+.session-exercise-head small { color: var(--muted); font-size: 12px; }
+.session-exercise-head .actions { gap: 7px; }
+.session-exercise-head .actions button { display: inline-flex; align-items: center; gap: 5px; }
+.session-set-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.session-set-chips > button { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 10px; row-gap: 4px; padding: 11px 13px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--soft); }
+.session-set-chips > button small { grid-column: 1 / -1; font-size: 10px; letter-spacing: .07em; }
+.session-set-chips > button strong { font-size: 14px; }
+.session-set-chips > button svg { opacity: .7; }
+.logged-set-list td:last-child { white-space: nowrap; }
+.logged-set-list td:last-child button { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 800px) {
+  .workout-exercise-nav { display: flex; overflow-x: auto; gap: 7px; margin: 9px 0 12px; padding-bottom: 3px; }
+  .workout-exercise-nav-item { flex: 0 0 auto; max-width: 210px; }
+  .workout-exercise-nav-item > button:first-child { padding: 8px 10px; }
+  .workout-exercise-nav-item b { font-size: 12px; }
+  .workout-exercise-nav-item .icon-remove { padding: 7px; }
+  .session-exercise-head { align-items: flex-start; }
+  .session-exercise-head .actions { flex-shrink: 0; }
+  .session-exercise-head .actions button { padding: 8px; }
+  .session-set-chips > button { min-height: 54px; }
+}
