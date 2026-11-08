@@ -211,7 +211,7 @@ export function Workout({
       setInputs((current) => {
         const updated = { ...current, [e.id]: { ...field, notes: "" } };
         if (!practice) {
-          try { localStorage.setItem("notebook-entry-" + draft.id, JSON.stringify(updated)); } catch {}
+          try { localStorage.setItem("notebook-entry-" + next.id, JSON.stringify(updated)); } catch {}
         }
         return updated;
       });
