@@ -8,6 +8,9 @@ import {
   ChevronRight,
   Save,
   RotateCcw,
+  Search,
+  Pencil,
+  X,
 } from "lucide-react";
 import {
   type Data,
@@ -84,18 +87,13 @@ export function Workout({
   const e = draft?.exercises[selected],
     previous =
       draft && e ? previousPerformance(data.sessions, draft, e) : undefined;
+  const previousSets = previous?.exercise.sets.filter((s) => s.completed && !s.warmup) || [];
+  const lastLogged = e?.sets.filter((s) => s.completed && !s.warmup).at(-1);
+  const suggestion = lastLogged || previousSets[Math.min(e?.sets.filter((s) => s.completed && !s.warmup).length || 0, Math.max(0, previousSets.length - 1))];
   const field = e
     ? inputs[e.id] || {
-        weight:
-          previous?.exercise.sets
-            .filter((s) => s.completed)
-            .at(-1)
-            ?.weight?.toString() || "",
-        reps:
-          previous?.exercise.sets
-            .filter((s) => s.completed)
-            .at(-1)
-            ?.reps.toString() || "",
+        weight: suggestion?.weight?.toString() ?? "",
+        reps: suggestion?.reps.toString() ?? "",
         rir: "",
         warmup: false,
         notes: "",
@@ -209,7 +207,14 @@ export function Workout({
         ),
       });
       await commit(next);
-      input("notes", "");
+      // Keep the newly logged load/reps ready for the next set, without wiping manual edits.
+      setInputs((current) => {
+        const updated = { ...current, [e.id]: { ...field, notes: "" } };
+        if (!practice) {
+          try { localStorage.setItem("notebook-entry-" + draft.id, JSON.stringify(updated)); } catch {}
+        }
+        return updated;
+      });
     } catch (err) {
       setError(workoutError(err));
     }
@@ -234,7 +239,7 @@ export function Workout({
   const inSession = (draft?.exercises || [])
     .map((exercise, index) => ({ exercise, index }))
     .filter(({ exercise }) => matches(exercise.name, exercise.equipment_name));
-  const available = finderOpen
+  const available = finderOpen && query.trim()
     ? data.models.flatMap((model) =>
         (model.exercises.length ? model.exercises : [model.name])
           .filter((name) =>
@@ -357,6 +362,7 @@ export function Workout({
   ];
   const exerciseSearch = (
     <div
+      className="exercise-finder"
       ref={finderRef}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -365,7 +371,7 @@ export function Workout({
         }
       }}
     >
-      <label htmlFor="movement-search">Find or add an exercise</label>
+      <label htmlFor="movement-search"><Search size={15} /> Add an exercise</label>
       <input
         id="movement-search"
         type="search"
@@ -377,7 +383,7 @@ export function Workout({
             submitSearch();
           }
         }}
-        placeholder="Search exercises, e.g. lat pulldown"
+        placeholder="Search to add a movement…"
         value={query}
         aria-expanded={finderOpen}
         aria-controls="movement-results"
@@ -388,17 +394,9 @@ export function Workout({
           setFinderOpen(true);
         }}
       />
-      {finderOpen && (
+      {finderOpen && query.trim() && (
         <div id="movement-results" className="movement-results">
-          <button
-            type="button"
-            onClick={() => {
-              setFinderOpen(false);
-              setQuery("");
-            }}
-          >
-            Close search
-          </button>
+
           {inSession.length > 0 && <h3>In this workout</h3>}
           {inSession.map(({ exercise, index }) => (
             <button
@@ -574,7 +572,25 @@ export function Workout({
         </div>
       )}
       <div className="workout-layout">
-        <aside className="card movement-picker">{exerciseSearch}</aside>
+        <aside className="card movement-picker">
+          <h3>Exercises in this workout</h3>
+          <div className="workout-exercise-nav">
+            {draft.exercises.map((x, index) => (
+              <div className={`workout-exercise-nav-item ${selected === index ? "current" : ""}`} key={x.id}>
+                <button type="button" onClick={() => showLogger(index)}>
+                  <b>{x.name}</b>
+                  <small>{x.sets.length} {x.sets.length === 1 ? "set" : "sets"}{x.skipped ? " · skipped" : ""}</small>
+                </button>
+                <button type="button" className="icon-remove" disabled={locked} aria-label={`Remove ${x.name}`} title="Remove exercise" onClick={() => {
+                  if (!confirm(`Remove ${x.name} and its ${x.sets.length} saved sets?`)) return;
+                  void action({ ...draft, exercises: draft.exercises.filter((item) => item.id !== x.id) });
+                  setSelected((current) => Math.max(0, Math.min(current > index ? current - 1 : current, draft.exercises.length - 2)));
+                }}><X size={16}/></button>
+              </div>
+            ))}
+          </div>
+          {exerciseSearch}
+        </aside>
         <section ref={loggerRef} className="card logger">
           {e && field ? (
             <>
@@ -862,7 +878,7 @@ export function Workout({
                   {practice ? "Test sets" : "Saved to your account"}
                 </small>
               </div>
-              <div className="table-wrap">
+              <div className="table-wrap logged-set-list">
                 <table>
                   <thead>
                     <tr>
@@ -891,9 +907,10 @@ export function Workout({
                         <td>
                           <button
                             disabled={locked}
+                            aria-label={`Edit set ${i + 1}`}
                             onClick={() => setEditing({ ...s })}
                           >
-                            Edit
+                            <Pencil size={15} /> Edit
                           </button>
                           <button
                             aria-label={`Delete set ${i + 1}`}
@@ -993,16 +1010,32 @@ export function Workout({
             />
           </label>
         </div>
-        {draft.exercises.map((x) => (
-          <p key={x.id}>
-            <b>{x.name}</b> ·{" "}
-            {x.skipped
-              ? "Skipped"
-              : x.sets
-                  .map((s) => `${s.weight ?? "?"} lb × ${s.reps}`)
-                  .join(" / ") || "No sets yet"}
-          </p>
-        ))}
+        <div className="session-exercise-cards">
+          {draft.exercises.map((x, index) => (
+            <div className="session-exercise-card" key={x.id}>
+              <div className="session-exercise-head">
+                <div><b>{x.name}</b><small>{x.skipped ? "Skipped" : `${x.sets.length} sets logged`}</small></div>
+                <div className="actions">
+                  <button disabled={locked} onClick={() => { showLogger(index); loggerRef.current?.scrollIntoView({ block: "start" }); }}><Pencil size={15}/> Edit sets</button>
+                  <button disabled={locked} className="icon-remove" title="Remove exercise" aria-label={`Remove ${x.name}`} onClick={() => {
+                    if (!confirm(`Remove ${x.name} and all its sets?`)) return;
+                    void action({ ...draft, exercises: draft.exercises.filter((item) => item.id !== x.id) });
+                    setSelected(0);
+                  }}><Trash2 size={16}/></button>
+                </div>
+              </div>
+              <div className="session-set-chips">
+                {x.sets.length ? x.sets.map((set, i) => (
+                  <button key={set.id} disabled={locked} title="Edit this set" onClick={() => { setSelected(index); setEditing({ ...set }); }}>
+                    <small>SET {i + 1}{set.warmup ? " · WARM-UP" : ""}</small>
+                    <strong>{set.weight === null ? "—" : `${set.weight} lb`} × {set.reps}</strong>
+                    <Pencil size={13}/>
+                  </button>
+                )) : <small>No sets logged</small>}
+              </div>
+            </div>
+          ))}
+        </div>
         {draft.source && <p>Source: {draft.source}</p>}
         <button
           className="danger"
@@ -1021,7 +1054,7 @@ export function Workout({
           <Trash2 size={16} /> {preparing ? "Discard draft" : "Delete workout"}
         </button>
       </details>
-      {editing && e && (
+      {editing && draft && (
         <div className="modal-backdrop">
           <form
             className="modal"
@@ -1034,7 +1067,7 @@ export function Workout({
                 const next = sessionSchema.parse({
                   ...draft,
                   exercises: draft.exercises.map((x) =>
-                    x.id === e.id
+                    x.sets.some((t) => t.id === editing.id)
                       ? {
                           ...x,
                           sets: x.sets.map((t) =>
